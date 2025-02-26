@@ -16,7 +16,7 @@ def show_image(img, title='Image', figsize=(10,10)):
     plt.show()
 
 # Load and display original image
-image_path = "../dataset/video_1.png"
+image_path = "../dataset/example_1.png"
 original = cv.imread(image_path)
 show_image(original, "Original Image")
 
@@ -65,5 +65,53 @@ def find_chessboard_corners(img):
     return largest_contour
 
 largest_contour = find_chessboard_corners(processed)
+
+# %%
+# 3. Square Detection cell
+def split_chessboard(img, contour):
+    # Get bounding rectangle of the contour
+    x, y, w, h = cv.boundingRect(contour)
+    
+    # Extract the chessboard region
+    chessboard = original[y:y+h, x:x+w]
+    show_image(chessboard, "Extracted Chessboard")
+    
+    # Calculate square size
+    square_width = w // 8
+    square_height = h // 8
+    
+    # Create a visualization of the grid
+    grid_img = chessboard.copy()
+    for i in range(8):
+        for j in range(8):
+            # Draw rectangle for each square
+            top_left = (j * square_width, i * square_height)
+            bottom_right = ((j + 1) * square_width, (i + 1) * square_height)
+            cv.rectangle(grid_img, top_left, bottom_right, (0, 255, 0), 1)
+    
+    show_image(grid_img, "Chessboard Grid")
+    
+    # Store individual squares (optional visualization)
+    squares = []
+    for i in range(8):
+        row = []
+        for j in range(8):
+            square = chessboard[i*square_height:(i+1)*square_height, 
+                              j*square_width:(j+1)*square_width]
+            row.append(square)
+        squares.append(row)
+    
+    # Show a few example squares (optional)
+    plt.figure(figsize=(15,3))
+    for i in range(5):  # Show first 5 squares of the top row
+        plt.subplot(1,5,i+1)
+        square_img = cv.cvtColor(squares[0][i], cv.COLOR_BGR2RGB)
+        plt.imshow(square_img)
+        plt.axis('off')
+    plt.show()
+    
+    return squares
+
+squares = split_chessboard(original, largest_contour)
 
 # %%
