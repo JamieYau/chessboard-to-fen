@@ -1,0 +1,15 @@
+dataset/
+datasets/
+data/
+.venv/
+venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# remove later
+Dockerfile
+.dockerignore
+.github/workflows/
+src/script.py
+tests/
