@@ -17,7 +17,6 @@ runs/
 Dockerfile
 .dockerignore
 .github/workflows/
-src/script.py
 tests/
 
 # Environment variables

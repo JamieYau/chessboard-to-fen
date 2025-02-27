@@ -18,34 +18,31 @@ def show_image(img, title='Image', figsize=(10,10)):
     plt.show()
 
 # Load and display original image
-image_path = "../dataset/screenshots/image.png"
+image_path = "../dataset/screenshots/example_1.png"
 original = cv.imread(image_path)
 show_image(original, "Original Image")
 
 # %%
 # 1. Preprocessing cell
 def preprocess_image(img):
-    # Convert to grayscale but keep the original for later use
     gray = cv.cvtColor(img, cv.COLOR_BGR2GRAY)
-    
-    # Gaussian blur: (5,5) is kernel size, 0 is sigma
-    # Smaller kernel = less blurring. You can try (3,3) for less blur
     blurred = cv.GaussianBlur(gray, (3, 3), 0)
     
     # Show intermediate steps
     show_image(gray, "Grayscale Image")
     show_image(blurred, "After Gaussian Blur")
     
-    return blurred  # Return blurred image instead of threshold
+    return blurred
 
 processed = preprocess_image(original)
 show_image(processed, "Processed Image")
 
 # %%
 # 2. Chessboard Detection cell
-def find_chessboard_corners(img):
+def find_chessboard(img):
+    processed = preprocess_image(img)
     # Find edges using Canny edge detection
-    edges = cv.Canny(img, 50, 150)
+    edges = cv.Canny(processed, 50, 150)
     show_image(edges, "Edge Detection")
     
     # Find contours in the edge image
@@ -64,114 +61,81 @@ def find_chessboard_corners(img):
     cv.drawContours(largest_contour_img, [largest_contour], -1, (0, 255, 0), 2)
     show_image(largest_contour_img, "Largest Contour")
     
-    return largest_contour
-
-largest_contour = find_chessboard_corners(processed)
-
-# %%
-# 3. Square Detection cell
-def split_chessboard(img, contour):
-    # Get bounding rectangle of the contour
-    x, y, w, h = cv.boundingRect(contour)
+    # Get bounding rectangle
+    x, y, w, h = cv.boundingRect(largest_contour)
     
     # Extract the chessboard region
-    chessboard = original[y:y+h, x:x+w]
-    show_image(chessboard, "Extracted Chessboard")
+    chessboard = img[y:y+h, x:x+w]
     
-    # Calculate square size
-    square_width = w // 8
-    square_height = h // 8
-    
-    # Create a visualization of the grid
-    grid_img = chessboard.copy()
-    for i in range(8):
-        for j in range(8):
-            # Draw rectangle for each square
-            top_left = (j * square_width, i * square_height)
-            bottom_right = ((j + 1) * square_width, (i + 1) * square_height)
-            cv.rectangle(grid_img, top_left, bottom_right, (0, 255, 0), 1)
-    
-    show_image(grid_img, "Chessboard Grid")
-    
-    # Store individual squares (optional visualization)
-    squares = []
-    for i in range(8):
-        row = []
-        for j in range(8):
-            square = chessboard[i*square_height:(i+1)*square_height, 
-                              j*square_width:(j+1)*square_width]
-            row.append(square)
-        squares.append(row)
-    
-    # Show a few example squares (optional)
-    plt.figure(figsize=(15,3))
-    for i in range(5):  # Show first 5 squares of the top row
-        plt.subplot(1,5,i+1)
-        square_img = cv.cvtColor(squares[0][i], cv.COLOR_BGR2RGB)
-        plt.imshow(square_img)
-        plt.axis('off')
-    plt.show()
-    
-    return squares
+    return chessboard
 
-squares = split_chessboard(original, largest_contour)
+largest_contour = find_chessboard(original)
+
 
 # %%
-# 4. Piece Detection and Classification cell
+# 3. Piece Detection and Classification cell
 
 # Load your trained model
 model = YOLO('../models/chess_piece_detector/weights/best.pt')
 
-def detect_pieces_whole_board(squares):
-    # 1. Reconstruct full chessboard image
-    board_size = squares[0][0].shape[0] * 8
-    full_board = np.zeros((board_size, board_size, 3), dtype=np.uint8)
+def detect_pieces(board):
+    # Run YOLO detection on full board
+    predictions = model(board, conf=0.3)[0]
     
-    # Combine squares into full board
-    for i in range(8):
-        for j in range(8):
-            y_start = i * squares[0][0].shape[0]
-            x_start = j * squares[0][0].shape[1]
-            full_board[y_start:y_start + squares[0][0].shape[0], 
-                      x_start:x_start + squares[0][0].shape[1]] = squares[i][j]
+    # Get board dimensions
+    h, w = board.shape[:2]
+    square_size = h // 8
     
-    # 2. Run detection on full board
-    predictions = model(full_board, conf=0.3)[0]
+    # Initialize results grid with NumPy
+    results = np.full((8, 8), 'empty', dtype=object)  # or dtype=str
     
-    # 3. Initialize results array
-    results = [['empty' for _ in range(8)] for _ in range(8)]
-    
-    # 4. Process each detection
+    # Process detections
     for box in predictions.boxes:
-        # Get box coordinates and convert to square indices
-        x, y, w, h = box.xywh[0]  # Get center x, y and width, height
-        square_size = full_board.shape[0] / 8
-        
-        # Calculate which square this detection belongs to
+        x, y, w, h = box.xywh[0]
         col = int(x.item() / square_size)
         row = int(y.item() / square_size)
         
-        if 0 <= row < 8 and 0 <= col < 8:  # Ensure within bounds
+        if 0 <= row < 8 and 0 <= col < 8:
             class_name = predictions.names[int(box.cls[0])]
-            results[row][col] = class_name
+            results[row, col] = class_name
     
     return results
 
+def process_screenshot(image_path):
+    # 1. Load full screenshot
+    screenshot = cv.imread(image_path)
+    show_image(screenshot, "Original Screenshot")
+    
+    # 2. Find and extract chessboard
+    chessboard = find_chessboard(screenshot)
+    show_image(chessboard, "Extracted Chessboard")
+    
+    # 3. Detect pieces using YOLO
+    piece_positions = detect_pieces(chessboard)
+    
+    return piece_positions, chessboard
+
+# Use the pipeline
+positions, board = process_screenshot(image_path)
+
 # Visualize results
-def show_detections(squares, results):
+def show_detections(board, results):
+    h, w = board.shape[:2]
+    square_size = h // 8
+    
     plt.figure(figsize=(20,20))
     for i in range(8):
         for j in range(8):
+            # Extract and show each square
+            square = board[i*square_size:(i+1)*square_size, 
+                         j*square_size:(j+1)*square_size]
             plt.subplot(8,8,i*8+j+1)
-            square_img = cv.cvtColor(squares[i][j], cv.COLOR_BGR2RGB)
-            plt.imshow(square_img)
+            plt.imshow(cv.cvtColor(square, cv.COLOR_BGR2RGB))
             plt.title(f'{results[i][j]}', pad=2)
             plt.axis('off')
     plt.tight_layout()
     plt.show()
 
-# Use the model
-piece_positions = detect_pieces_whole_board(squares)
-show_detections(squares, piece_positions)
+show_detections(board, positions)
 
 # %%
