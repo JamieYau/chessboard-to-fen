@@ -1,7 +1,9 @@
 # %%
 import cv2 as cv
-import numpy as np
 import matplotlib.pyplot as plt
+import numpy as np
+from ultralytics import YOLO
+
 
 # %%
 # Helper function to display images in notebook
@@ -16,7 +18,7 @@ def show_image(img, title='Image', figsize=(10,10)):
     plt.show()
 
 # Load and display original image
-image_path = "../dataset/image.png"
+image_path = "../dataset/screenshots/image.png"
 original = cv.imread(image_path)
 show_image(original, "Original Image")
 
@@ -116,55 +118,60 @@ squares = split_chessboard(original, largest_contour)
 
 # %%
 # 4. Piece Detection and Classification cell
-def analyze_square(square):
-    # Convert to HSV color space for better color analysis
-    hsv = cv.cvtColor(square, cv.COLOR_BGR2HSV)
-    
-    # Calculate the average color of the center region of the square
-    h, w = square.shape[:2]
-    center_region = hsv[h//4:3*h//4, w//4:3*w//4]
-    avg_color = np.mean(center_region, axis=(0,1))
-    
-    # Get average brightness (V in HSV)
-    brightness = avg_color[2]
-    
-    # Get standard deviation of colors to detect if there's a piece
-    color_std = np.std(center_region, axis=(0,1))
-    
-    # If there's significant color variation and it's not too bright,
-    # it's likely a piece
-    has_piece = color_std[2] > 30  # Adjust threshold as needed
-    
-    if has_piece:
-        # If average brightness is low, it's likely a black piece
-        is_black = brightness < 128
-        return 'b' if is_black else 'w'
-    else:
-        return 'empty'
 
-# Test the square analysis
-def visualize_square_analysis(squares):
-    results = []
-    for i in range(8):
-        row = []
-        for j in range(8):
-            result = analyze_square(squares[i][j])
-            row.append(result)
-        results.append(row)
+# Load your trained model
+model = YOLO('../models/chess_piece_detector/weights/best.pt')
+
+def detect_pieces_whole_board(squares):
+    # 1. Reconstruct full chessboard image
+    board_size = squares[0][0].shape[0] * 8
+    full_board = np.zeros((board_size, board_size, 3), dtype=np.uint8)
     
-    # Display first two rows with classifications
-    plt.figure(figsize=(20,5))
-    for i in range(8):  # First two rows
-        for j in range(8):  # All columns
-            plt.subplot(8,8,i*8+j+1)
-            square_img = cv.cvtColor(squares[i][j], cv.COLOR_BGR2RGB)
-            plt.imshow(square_img)
-            plt.title(f'{results[i][j]}')
-            plt.axis('off')
-    plt.show()
+    # Combine squares into full board
+    for i in range(8):
+        for j in range(8):
+            y_start = i * squares[0][0].shape[0]
+            x_start = j * squares[0][0].shape[1]
+            full_board[y_start:y_start + squares[0][0].shape[0], 
+                      x_start:x_start + squares[0][0].shape[1]] = squares[i][j]
+    
+    # 2. Run detection on full board
+    predictions = model(full_board, conf=0.3)[0]
+    
+    # 3. Initialize results array
+    results = [['empty' for _ in range(8)] for _ in range(8)]
+    
+    # 4. Process each detection
+    for box in predictions.boxes:
+        # Get box coordinates and convert to square indices
+        x, y, w, h = box.xywh[0]  # Get center x, y and width, height
+        square_size = full_board.shape[0] / 8
+        
+        # Calculate which square this detection belongs to
+        col = int(x.item() / square_size)
+        row = int(y.item() / square_size)
+        
+        if 0 <= row < 8 and 0 <= col < 8:  # Ensure within bounds
+            class_name = predictions.names[int(box.cls[0])]
+            results[row][col] = class_name
     
     return results
 
-piece_positions = visualize_square_analysis(squares)
+# Visualize results
+def show_detections(squares, results):
+    plt.figure(figsize=(20,20))
+    for i in range(8):
+        for j in range(8):
+            plt.subplot(8,8,i*8+j+1)
+            square_img = cv.cvtColor(squares[i][j], cv.COLOR_BGR2RGB)
+            plt.imshow(square_img)
+            plt.title(f'{results[i][j]}', pad=2)
+            plt.axis('off')
+    plt.tight_layout()
+    plt.show()
+
+# Use the model
+piece_positions = detect_pieces_whole_board(squares)
+show_detections(squares, piece_positions)
 
 # %%

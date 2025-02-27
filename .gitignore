@@ -1,15 +1,24 @@
-dataset/
-datasets/
-data/
-.venv/
-venv/
+# Python
 __pycache__/
 *.pyc
 .pytest_cache/
+.venv/
+venv/
 
-# remove later
+# Notebooks
+.ipynb_checkpoints/
+
+# Dataset and models
+dataset/
+models/
+runs/
+
+# Development
 Dockerfile
 .dockerignore
 .github/workflows/
 src/script.py
 tests/
+
+# Environment variables
+.env
