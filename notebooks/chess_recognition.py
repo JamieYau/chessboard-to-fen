@@ -16,7 +16,7 @@ def show_image(img, title='Image', figsize=(10,10)):
     plt.show()
 
 # Load and display original image
-image_path = "../dataset/example_1.png"
+image_path = "../dataset/image.png"
 original = cv.imread(image_path)
 show_image(original, "Original Image")
 
@@ -113,5 +113,58 @@ def split_chessboard(img, contour):
     return squares
 
 squares = split_chessboard(original, largest_contour)
+
+# %%
+# 4. Piece Detection and Classification cell
+def analyze_square(square):
+    # Convert to HSV color space for better color analysis
+    hsv = cv.cvtColor(square, cv.COLOR_BGR2HSV)
+    
+    # Calculate the average color of the center region of the square
+    h, w = square.shape[:2]
+    center_region = hsv[h//4:3*h//4, w//4:3*w//4]
+    avg_color = np.mean(center_region, axis=(0,1))
+    
+    # Get average brightness (V in HSV)
+    brightness = avg_color[2]
+    
+    # Get standard deviation of colors to detect if there's a piece
+    color_std = np.std(center_region, axis=(0,1))
+    
+    # If there's significant color variation and it's not too bright,
+    # it's likely a piece
+    has_piece = color_std[2] > 30  # Adjust threshold as needed
+    
+    if has_piece:
+        # If average brightness is low, it's likely a black piece
+        is_black = brightness < 128
+        return 'b' if is_black else 'w'
+    else:
+        return 'empty'
+
+# Test the square analysis
+def visualize_square_analysis(squares):
+    results = []
+    for i in range(8):
+        row = []
+        for j in range(8):
+            result = analyze_square(squares[i][j])
+            row.append(result)
+        results.append(row)
+    
+    # Display first two rows with classifications
+    plt.figure(figsize=(20,5))
+    for i in range(8):  # First two rows
+        for j in range(8):  # All columns
+            plt.subplot(8,8,i*8+j+1)
+            square_img = cv.cvtColor(squares[i][j], cv.COLOR_BGR2RGB)
+            plt.imshow(square_img)
+            plt.title(f'{results[i][j]}')
+            plt.axis('off')
+    plt.show()
+    
+    return results
+
+piece_positions = visualize_square_analysis(squares)
 
 # %%
