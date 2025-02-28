@@ -18,7 +18,7 @@ def show_image(img, title='Image', figsize=(10,10)):
     plt.show()
 
 # Load and display original image
-image_path = "../dataset/screenshots/IMG_0816.JPG"
+image_path = "../dataset/screenshots/example_1.png"
 original = cv.imread(image_path)
 show_image(original, "Original Image")
 
@@ -32,9 +32,9 @@ def preprocess_image(img):
     enhanced = clahe.apply(blurred)
     
     # Show intermediate steps
-    show_image(gray, "Grayscale Image")
-    show_image(blurred, "After Gaussian Blur")
-    show_image(enhanced, "After CLAHE")
+    # show_image(gray, "Grayscale Image")
+    # show_image(blurred, "After Gaussian Blur")
+    # show_image(enhanced, "After CLAHE")
     
     # Convert back to BGR for YOLO
     enhanced_bgr = cv.cvtColor(enhanced, cv.COLOR_GRAY2BGR)
@@ -95,11 +95,10 @@ def detect_pieces(board):
 
 def process_screenshot(image_path):
     # 1. Load full screenshot
-    screenshot = cv.imread(image_path)
-    show_image(screenshot, "Original Screenshot")
+    original = cv.imread(image_path)
     
     # 2. Find and extract chessboard
-    chessboard = find_chessboard(screenshot)
+    chessboard = find_chessboard(original)
     show_image(chessboard, "Extracted Chessboard")
     
     # 3. Detect pieces using YOLO
