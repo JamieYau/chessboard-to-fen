@@ -18,7 +18,7 @@ def show_image(img, title='Image', figsize=(10,10)):
     plt.show()
 
 # Load and display original image
-image_path = "../dataset/screenshots/full_screenshot.png"
+image_path = "../dataset/screenshots/IMG_0816.JPG"
 original = cv.imread(image_path)
 show_image(original, "Original Image")
 
@@ -27,55 +27,47 @@ show_image(original, "Original Image")
 def preprocess_image(img):
     gray = cv.cvtColor(img, cv.COLOR_BGR2GRAY)
     blurred = cv.GaussianBlur(gray, (3, 3), 0)
+    # Enhance contrast using CLAHE (Contrast Limited Adaptive Histogram Equalization)
+    clahe = cv.createCLAHE(clipLimit=2.0, tileGridSize=(8,8))
+    enhanced = clahe.apply(blurred)
     
     # Show intermediate steps
     show_image(gray, "Grayscale Image")
     show_image(blurred, "After Gaussian Blur")
+    show_image(enhanced, "After CLAHE")
     
-    return blurred
+    # Convert back to BGR for YOLO
+    enhanced_bgr = cv.cvtColor(enhanced, cv.COLOR_GRAY2BGR)
+    
+    return enhanced_bgr
 
 processed = preprocess_image(original)
 show_image(processed, "Processed Image")
 
 # %%
 # 2. Chessboard Detection cell
+
+board_model = YOLO('../models/chessboard_corners/weights/best.pt')
+
 def find_chessboard(img):
-    processed = preprocess_image(img)
-    # Find edges using Canny edge detection
-    edges = cv.Canny(processed, 50, 150)
-    show_image(edges, "Edge Detection")
+    # Detect board in the image
+    results = board_model(img)[0]
     
-    # Find contours in the edge image
-    contours, hierarchy = cv.findContours(edges, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE)
-    
-    # Draw all contours on a copy of the original image
-    contour_img = original.copy()
-    cv.drawContours(contour_img, contours, -1, (0, 255, 0), 2)
-    show_image(contour_img, "All Contours")
-    
-    # Find the largest contour (likely to be the chessboard)
-    largest_contour = max(contours, key=cv.contourArea)
-    
-    # Draw only the largest contour
-    largest_contour_img = original.copy()
-    cv.drawContours(largest_contour_img, [largest_contour], -1, (0, 255, 0), 2)
-    show_image(largest_contour_img, "Largest Contour")
-    
-    # Get bounding rectangle
-    x, y, w, h = cv.boundingRect(largest_contour)
-    
-    # Extract the chessboard region
-    chessboard = img[y:y+h, x:x+w]
-    
-    return chessboard
-
-largest_contour = find_chessboard(original)
-
+    if len(results.boxes) > 0:
+        # Get the box with highest confidence
+        box = results.boxes[0]
+        x1, y1, x2, y2 = box.xyxy[0]  # Get corner coordinates
+        
+        # Extract board region
+        chessboard = img[int(y1):int(y2), int(x1):int(x2)]
+        return chessboard
+    else:
+        raise Exception("No chessboard detected in image")
 
 # %%
 # 3. Piece Detection and Classification cell
 
-# Load your trained model
+# Load trained model
 model = YOLO('../models/chess_piece_detector/weights/best.pt')
 
 def detect_pieces(board):
@@ -87,7 +79,7 @@ def detect_pieces(board):
     square_size = h // 8
     
     # Initialize results grid with NumPy
-    results = np.full((8, 8), 'empty', dtype=object)  # or dtype=str
+    results = np.full((8, 8), 'empty', dtype=object)
     
     # Process detections
     for box in predictions.boxes:
