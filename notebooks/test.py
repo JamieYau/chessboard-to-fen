@@ -14,6 +14,13 @@ def resize_image(image, scale):
     widthScale = int(width * scale)
     return cv.resize(image, (widthScale, heightScale), interpolation=cv.INTER_LINEAR)
 
+def show_image(image, title="Image"):
+    while True:
+        if cv.waitKey(1) == ord('q'):
+            break
+        cv.imshow(title, image)
+    cv.destroyWindow(title)
+
 # Read image
 root = os.getcwd()
 IMAGE_PATH = os.path.join(root, "../dataset/screenshots/board.png")
@@ -65,12 +72,7 @@ def canny_edge_detection(image):
 
 canny_edge_visualization(IMG_GRAY)
 canny_edges = canny_edge_detection(IMG_BLUR)
-
-while True:
-    if cv.waitKey(1) == ord('q'):
-        break
-    cv.imshow("Canny Edges", canny_edges)
-cv.destroyWindow("Canny Edges")
+show_image(canny_edges, "Canny Edges")
 
 # %%
 
@@ -96,12 +98,7 @@ def draw_contours(image, contours):
         x, y, w, h = cv.boundingRect(contour)
         cv.rectangle(image, (x, y), (x + w, y + h), (0, 0, 255), 2)
         
-    while True:
-        if cv.waitKey(1) == ord('q'):
-            break
-        cv.imshow("Contour", image)
-    cv.destroyWindow("Contour")
-
+    show_image(image, "Contour")
 
 # %%
 
@@ -136,13 +133,10 @@ def find_lines(canny_edges):
         cv.circle(IMG_RGB_COPY_2, (x1, y1), 5, (0, 255, 0), -1)
         cv.circle(IMG_RGB_COPY_2, (x2, y2), 5, (255, 0, 0), -1)
         
-    while True:
-        if cv.waitKey(1) == ord('q'):
-            break
-        cv.imshow("Lines", IMG_RGB_COPY_2)
-    cv.destroyWindow("Lines")
+    show_image(IMG_RGB_COPY_2, "Lines")
     
     return horizontal, vertical
+
 horizontal, vertical = find_lines(canny_edges)
 
 # %%
@@ -155,11 +149,7 @@ def template_matching(image, template):
     bottom_right = (top_left[0] + width, top_left[1] + height)
     cv.rectangle(image, top_left, bottom_right, (0, 0, 255), 2)
     
-    while True:
-        if cv.waitKey(1) == ord('q'):
-            break
-        cv.imshow("Template", image)
-    cv.destroyWindow("Template")
+    show_image(image, "Template Matching")
     
 TEMPLATE_PATH = os.path.join(root, "../dataset/screenshots/template.png")
 template = cv.imread(TEMPLATE_PATH, cv.IMREAD_GRAYSCALE)
